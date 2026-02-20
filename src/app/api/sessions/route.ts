@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const API_URL =
-  "https://n8n-automation-test.iohealth.com/webhook/nlq-v2/sessions";
+  "https://n8n-automation-test3.iohealth.com/webhook/nlq-marsad/sessions";
 
 export async function GET(request: NextRequest) {
   try {
