@@ -27,7 +27,26 @@ export default function ChatMessage({ message }: ChatMessageProps) {
       >
         <div className={`px-4 py-3 ${isUser ? 'text-white' : ''}`}>
           {isUser ? (
-            <p className="text-sm md:text-base whitespace-pre-wrap">{message.content}</p>
+            message.isVoice ? (
+              <div className="flex items-center gap-2 text-sm md:text-base">
+                <svg
+                  className="w-4 h-4 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 11a7 7 0 01-14 0m7 7v4m-4 0h8m-4-12a3 3 0 00-3 3v4a3 3 0 006 0V8a3 3 0 00-3-3z"
+                  />
+                </svg>
+                <span>Voice message</span>
+              </div>
+            ) : (
+              <p className="text-sm md:text-base whitespace-pre-wrap">{message.content}</p>
+            )
           ) : (
             <>
               {isChart ? (

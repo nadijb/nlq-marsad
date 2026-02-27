@@ -86,8 +86,13 @@ export default function ChatInterface() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -103,6 +108,14 @@ export default function ChatInterface() {
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 150)}px`;
     }
   }, [input]);
+
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+      }
+    };
+  }, []);
 
   const loadSessionMessages = async (selectedSessionId: string) => {
     setIsLoadingHistory(true);
@@ -123,6 +136,47 @@ export default function ChatInterface() {
       console.error("Error loading session messages:", error);
     } finally {
       setIsLoadingHistory(false);
+    }
+  };
+
+  const handleApiResponse = async (
+    response: Response,
+    fallbackError: string,
+  ) => {
+    const data: ApiResponse = await response.json();
+
+    if (data.status === "success" && data.data) {
+      const assistantMessage: Message = {
+        id: uuidv4(),
+        role: "assistant",
+        content: "",
+        timestamp: new Date(),
+      };
+
+      if (data.data.type === "text") {
+        const textData = data.data as TextResponse;
+        assistantMessage.content = textData.text.value;
+        assistantMessage.responseType = "text";
+      } else if (data.data.type === "chart") {
+        const chartData = data.data as ChartResponse;
+        assistantMessage.responseType = "chart";
+        assistantMessage.chartData = chartData.chart;
+        assistantMessage.analysis = chartData.analysis?.value;
+        assistantMessage.content = chartData.analysis?.value || "";
+      }
+
+      setMessages((prev) => [...prev, assistantMessage]);
+    } else {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: uuidv4(),
+          role: "assistant",
+          content: data.message || fallbackError,
+          responseType: "text",
+          timestamp: new Date(),
+        },
+      ]);
     }
   };
 
@@ -152,61 +206,30 @@ export default function ChatInterface() {
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           session_id: currentSessionId,
           message: userMessage.content,
         }),
       });
 
-      const data: ApiResponse = await response.json();
-
-      if (data.status === "success" && data.data) {
-        const assistantMessage: Message = {
-          id: uuidv4(),
-          role: "assistant",
-          content: "",
-          timestamp: new Date(),
-        };
-
-        if (data.data.type === "text") {
-          const textData = data.data as TextResponse;
-          assistantMessage.content = textData.text.value;
-          assistantMessage.responseType = "text";
-        } else if (data.data.type === "chart") {
-          const chartData = data.data as ChartResponse;
-          assistantMessage.responseType = "chart";
-          assistantMessage.chartData = chartData.chart;
-          assistantMessage.analysis = chartData.analysis?.value;
-          assistantMessage.content = chartData.analysis?.value || "";
-        }
-
-        setMessages((prev) => [...prev, assistantMessage]);
-      } else {
-        const errorMessage: Message = {
+      await handleApiResponse(
+        response,
+        "Sorry, I encountered an error processing your request. Please try again.",
+      );
+    } catch (error) {
+      console.error("Error sending message:", error);
+      setMessages((prev) => [
+        ...prev,
+        {
           id: uuidv4(),
           role: "assistant",
           content:
-            data.message ||
             "Sorry, I encountered an error processing your request. Please try again.",
           responseType: "text",
           timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, errorMessage]);
-      }
-    } catch (error) {
-      console.error("Error sending message:", error);
-      const errorMessage: Message = {
-        id: uuidv4(),
-        role: "assistant",
-        content:
-          "Sorry, I encountered an error processing your request. Please try again.",
-        responseType: "text",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+        },
+      ]);
     } finally {
       setIsLoading(false);
     }
@@ -223,6 +246,138 @@ export default function ChatInterface() {
     setMessages([]);
     setSessionId(null);
     setInput("");
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: "audio/webm",
+        });
+        await sendVoiceMessage(audioBlob);
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingDuration(0);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration((prev) => prev + 1);
+      }, 1000);
+    } catch (error) {
+      console.error("Error accessing microphone:", error);
+    }
+  };
+
+  const stopRecording = () => {
+    if (
+      mediaRecorderRef.current &&
+      mediaRecorderRef.current.state === "recording"
+    ) {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  };
+
+  const cancelRecording = () => {
+    if (
+      mediaRecorderRef.current &&
+      mediaRecorderRef.current.state === "recording"
+    ) {
+      mediaRecorderRef.current.ondataavailable = null;
+      mediaRecorderRef.current.onstop = null;
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream
+        .getTracks()
+        .forEach((track) => track.stop());
+    }
+    setIsRecording(false);
+    setRecordingDuration(0);
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  };
+
+  const sendVoiceMessage = async (audioBlob: Blob) => {
+    const currentSessionId = sessionId || generateSessionId();
+    if (!sessionId) {
+      setSessionId(currentSessionId);
+    }
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: uuidv4(),
+        role: "user",
+        content: "Voice message",
+        isVoice: true,
+        timestamp: new Date(),
+      },
+    ]);
+    setIsLoading(true);
+
+    try {
+      const base64Audio = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64 = (reader.result as string).split(",")[1];
+          resolve(base64);
+        };
+        reader.readAsDataURL(audioBlob);
+      });
+
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: currentSessionId,
+          message: "",
+          audio: base64Audio,
+        }),
+      });
+
+      await handleApiResponse(
+        response,
+        "Sorry, I encountered an error processing your voice message. Please try again.",
+      );
+    } catch (error) {
+      console.error("Error sending voice message:", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: uuidv4(),
+          role: "assistant",
+          content:
+            "Sorry, I encountered an error processing your voice message. Please try again.",
+          responseType: "text",
+          timestamp: new Date(),
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   return (
@@ -330,42 +485,124 @@ export default function ChatInterface() {
       {/* Input Area */}
       <div className="bg-white border-t border-gray-200 px-4 py-4">
         <div className="max-w-4xl mx-auto">
-          <div className="flex items-end gap-3">
-            <div className="flex-1 relative">
-              <textarea
-                ref={textareaRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Ask a question about your healthcare data..."
-                className="w-full px-4 py-3 pr-12 text-sm md:text-base border border-gray-300 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                rows={1}
-                disabled={isLoading || isLoadingHistory}
-              />
-            </div>
-            <button
-              onClick={sendMessage}
-              disabled={!input.trim() || isLoading || isLoadingHistory}
-              className="px-5 py-3 bg-primary text-white rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
+          {isRecording ? (
+            <div className="flex items-center gap-3">
+              {/* Cancel button */}
+              <button
+                onClick={cancelRecording}
+                className="p-3 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+                aria-label="Cancel recording"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+              {/* Recording indicator */}
+              <div className="flex-1 flex items-center gap-3 px-4 py-3 bg-red-50 border border-red-200 rounded-xl">
+                <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse flex-shrink-0" />
+                <span className="text-sm text-red-600 font-medium">
+                  Recording...
+                </span>
+                <span className="text-sm text-red-400">
+                  {formatDuration(recordingDuration)}
+                </span>
+              </div>
+              {/* Send recording button */}
+              <button
+                onClick={stopRecording}
+                className="px-5 py-3 bg-primary text-white rounded-xl hover:bg-primary-600 transition-colors flex items-center justify-center"
+                aria-label="Send voice message"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                  />
+                </svg>
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-end gap-3">
+              <div className="flex-1 relative">
+                <textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Ask a question about your healthcare data..."
+                  className="w-full px-4 py-3 pr-12 text-sm md:text-base border border-gray-300 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  rows={1}
+                  disabled={isLoading || isLoadingHistory}
                 />
-              </svg>
-            </button>
-          </div>
+              </div>
+              {input.trim() ? (
+                /* Send text button */
+                <button
+                  onClick={sendMessage}
+                  disabled={isLoading || isLoadingHistory}
+                  className="px-5 py-3 bg-primary text-white rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                    />
+                  </svg>
+                </button>
+              ) : (
+                /* Mic button — shown when input is empty */
+                <button
+                  onClick={startRecording}
+                  disabled={isLoading || isLoadingHistory}
+                  className="px-5 py-3 bg-primary text-white rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+                  aria-label="Record voice message"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 11a7 7 0 01-14 0m7 7v4m-4 0h8m-4-12a3 3 0 00-3 3v4a3 3 0 006 0V8a3 3 0 00-3-3z"
+                    />
+                  </svg>
+                </button>
+              )}
+            </div>
+          )}
           <p className="mt-2 text-xs text-gray-400 text-center">
-            Press Enter to send, Shift + Enter for new line
+            {isRecording
+              ? "Click send to submit, or X to cancel"
+              : "Press Enter to send, Shift + Enter for new line"}
           </p>
         </div>
       </div>

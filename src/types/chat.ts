@@ -45,6 +45,7 @@ export interface Message {
   responseType?: 'text' | 'chart'
   chartData?: ChartResponse['chart']
   analysis?: string
+  isVoice?: boolean
   timestamp: Date
 }
 
