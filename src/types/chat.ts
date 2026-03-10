@@ -10,11 +10,19 @@ export interface ChartDataValue {
 }
 
 export interface ChartData {
-  nameKey: string
-  valueKey: string
-  values: ChartDataValue[]
+  nameKey?: string
+  valueKey?: string
+  xKey?: string
+  yKey?: string
+  zKey?: string
   xAxisKey?: string
   yAxisKey?: string
+  seriesName?: string
+  label?: string
+  unit?: string
+  min?: number
+  max?: number
+  values: ChartDataValue[]
   lines?: { dataKey: string; stroke?: string; name?: string }[]
   bars?: { dataKey: string; fill?: string; name?: string }[]
 }
