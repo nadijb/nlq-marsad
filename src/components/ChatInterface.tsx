@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
 import Logo from "./Logo";
 import ChatMessage from "./ChatMessage";
@@ -80,6 +81,9 @@ function convertRawMessageToMessage(rawMessage: RawMessage): Message {
 }
 
 export default function ChatInterface() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -116,6 +120,25 @@ export default function ChatInterface() {
       }
     };
   }, []);
+
+  // On mount: if ?session_id= is in the URL, load that session and open sidebar
+  useEffect(() => {
+    const urlSessionId = searchParams.get("session_id");
+    if (urlSessionId) {
+      loadSessionMessages(urlSessionId);
+      setIsSidebarOpen(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keep URL in sync with the active session
+  useEffect(() => {
+    if (sessionId) {
+      router.replace(`?session_id=${sessionId}`, { scroll: false });
+    } else {
+      router.replace("/", { scroll: false });
+    }
+  }, [sessionId, router]);
 
   const loadSessionMessages = async (selectedSessionId: string) => {
     setIsLoadingHistory(true);
