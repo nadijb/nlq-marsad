@@ -68,6 +68,7 @@ export interface RawMessage {
   content: string
   created_at: string
   session_id: string
+  comment?: string | null
 }
 
 export interface SessionsListResponse {

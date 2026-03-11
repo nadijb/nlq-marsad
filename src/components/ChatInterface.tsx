@@ -24,6 +24,7 @@ function parseAIContent(content: string): {
   type: "text" | "chart";
   text?: string;
   chartData?: ChartResponse["chart"];
+  comment?: string;
 } {
   try {
     const parsed = JSON.parse(content);
@@ -35,6 +36,7 @@ function parseAIContent(content: string): {
           type: parsed.type,
           data: parsed.data,
         },
+        comment: parsed.comment || undefined,
       };
     }
     // Not chart data, treat as text
@@ -61,12 +63,14 @@ function convertRawMessageToMessage(rawMessage: RawMessage): Message {
   const parsed = parseAIContent(rawMessage.content);
 
   if (parsed.type === "chart" && parsed.chartData) {
+    const analysis = parsed.comment || rawMessage.comment || undefined;
     return {
       id: rawMessage.id,
       role: "assistant",
-      content: "",
+      content: analysis || "",
       responseType: "chart",
       chartData: parsed.chartData,
+      analysis,
       timestamp: new Date(rawMessage.created_at),
     };
   }
@@ -414,74 +418,103 @@ export default function ChatInterface() {
       />
 
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shadow-sm">
+      <header className="bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between shadow-[0_1px_12px_rgba(0,0,0,0.06)] z-10">
         <div className="flex items-center gap-3">
           {/* Menu Button */}
           <button
             onClick={() => setIsSidebarOpen(true)}
-            className="p-2 text-gray-600 hover:text-primary hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 text-gray-500 hover:text-primary hover:bg-primary/6 rounded-xl transition-all duration-150"
             aria-label="Open chat history"
           >
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h16M4 12h16M4 18h16"
-              />
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <Logo width={100} height={38} />
-          <div className="hidden sm:block h-6 w-px bg-gray-300" />
-          <h1 className="hidden sm:block text-lg font-semibold text-primary">
-            AI Assistant
-          </h1>
+          <Logo width={96} height={36} />
+          <div className="hidden sm:flex items-center gap-1.5 pl-3 border-l border-gray-200">
+            <span className="w-2 h-2 bg-emerald-400 rounded-full shadow-sm shadow-emerald-300" />
+            <span className="text-xs text-gray-400 font-medium">AI Online</span>
+          </div>
         </div>
         <button
           onClick={handleNewChat}
-          className="px-4 py-2 text-sm font-medium text-primary border border-primary rounded-lg hover:bg-primary hover:text-white transition-colors"
+          className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium text-primary border border-primary/25 bg-primary/5 rounded-xl hover:bg-primary hover:text-white hover:border-primary transition-all duration-150"
         >
-          New Chat
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          <span className="hidden sm:inline">New Chat</span>
         </button>
       </header>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 bg-gray-50">
+      <div className="flex-1 overflow-y-auto px-4 py-6 chat-background">
         <div className="max-w-4xl mx-auto">
           {isLoadingHistory ? (
             <div className="flex flex-col items-center justify-center h-full min-h-[60vh]">
-              <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin mb-4" />
-              <p className="text-gray-500">Loading chat history...</p>
+              <div className="w-10 h-10 border-2 border-primary/20 border-t-primary rounded-full animate-spin mb-4" />
+              <p className="text-sm text-gray-400 font-medium">Loading conversation...</p>
             </div>
           ) : messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full min-h-[60vh] text-center">
-              <Logo width={150} height={58} className="mb-6 opacity-80" />
-              <h2 className="text-2xl font-semibold text-primary mb-2">
-                Welcome to IOHealth AI
-              </h2>
-              <p className="text-gray-500 max-w-md">
-                Ask me anything about your healthcare data. I can help you
-                analyze patient information, generate reports, and visualize
-                trends.
+            <div className="flex flex-col items-center justify-center h-full min-h-[60vh] text-center px-4">
+              {/* Hero icon */}
+              <div className="relative mb-8">
+                <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
+                  <Logo width={36} height={36} />
+                </div>
+                <div className="absolute -inset-2 rounded-3xl border border-primary/15 pointer-events-none" />
+                <div className="absolute -inset-4 rounded-3xl border border-primary/8 pointer-events-none" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">IOHealth AI Assistant</h2>
+              <p className="text-gray-400 text-sm max-w-sm leading-relaxed mb-10">
+                Ask anything about your healthcare data — patient insights,
+                clinical trends, and reports at your fingertips.
               </p>
-              <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-xl">
                 {[
-                  "Show me the patient gender distribution",
-                  "What are the top diagnoses this month?",
-                  "How many patients visited last week?",
-                  "How many outpatients are in the system?",
-                ].map((suggestion, index) => (
+                  {
+                    text: "Show me the patient gender distribution",
+                    icon: (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+                      </svg>
+                    ),
+                  },
+                  {
+                    text: "What are the top diagnoses this month?",
+                    icon: (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                      </svg>
+                    ),
+                  },
+                  {
+                    text: "How many patients visited last week?",
+                    icon: (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    ),
+                  },
+                  {
+                    text: "How many outpatients are in the system?",
+                    icon: (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    ),
+                  },
+                ].map(({ text, icon }, index) => (
                   <button
                     key={index}
-                    onClick={() => setInput(suggestion)}
-                    className="p-3 text-sm text-left text-gray-600 bg-white border border-gray-200 rounded-lg hover:border-primary hover:text-primary transition-colors"
+                    onClick={() => setInput(text)}
+                    className="group flex items-start gap-3 p-4 text-left bg-white/80 border border-gray-200/80 rounded-xl hover:border-primary/30 hover:bg-white hover:shadow-md hover:shadow-primary/5 transition-all duration-200"
                   >
-                    {suggestion}
+                    <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-primary/8 flex items-center justify-center text-primary group-hover:bg-primary/12 transition-colors">
+                      {icon}
+                    </span>
+                    <span className="text-sm text-gray-500 group-hover:text-gray-800 leading-relaxed transition-colors pt-0.5">{text}</span>
                   </button>
                 ))}
               </div>
@@ -492,8 +525,13 @@ export default function ChatInterface() {
                 <ChatMessage key={message.id} message={message} />
               ))}
               {isLoading && (
-                <div className="flex justify-start mb-4">
-                  <div className="bg-white border border-gray-200 rounded-2xl rounded-bl-md shadow-sm">
+                <div className="flex items-start gap-3 mb-5">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-sm">
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                  </div>
+                  <div className="bg-white rounded-2xl rounded-tl-sm shadow-sm border border-gray-100 px-4 py-3">
                     <TypingIndicator />
                   </div>
                 </div>
@@ -505,126 +543,74 @@ export default function ChatInterface() {
       </div>
 
       {/* Input Area */}
-      <div className="bg-white border-t border-gray-200 px-4 py-4">
+      <div className="bg-white/90 backdrop-blur-sm border-t border-gray-100 px-4 pt-3 pb-4 shadow-[0_-6px_20px_rgba(0,0,0,0.04)]">
         <div className="max-w-4xl mx-auto">
           {isRecording ? (
-            <div className="flex items-center gap-3">
-              {/* Cancel button */}
+            <div className="flex items-center gap-2">
               <button
                 onClick={cancelRecording}
-                className="p-3 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+                className="flex-shrink-0 p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-150"
                 aria-label="Cancel recording"
               >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
-              {/* Recording indicator */}
-              <div className="flex-1 flex items-center gap-3 px-4 py-3 bg-red-50 border border-red-200 rounded-xl">
-                <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse flex-shrink-0" />
-                <span className="text-sm text-red-600 font-medium">
-                  Recording...
-                </span>
-                <span className="text-sm text-red-400">
-                  {formatDuration(recordingDuration)}
-                </span>
+              <div className="flex-1 flex items-center gap-3 px-4 py-3 bg-red-50 border border-red-200/80 rounded-2xl">
+                <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse flex-shrink-0" />
+                <span className="text-sm text-red-600 font-medium">Recording</span>
+                <span className="text-sm text-red-400 font-mono">{formatDuration(recordingDuration)}</span>
               </div>
-              {/* Send recording button */}
               <button
                 onClick={stopRecording}
-                className="px-5 py-3 bg-primary text-white rounded-xl hover:bg-primary-600 transition-colors flex items-center justify-center"
+                className="flex-shrink-0 p-2.5 bg-primary text-white rounded-xl hover:bg-primary-600 transition-all duration-150"
                 aria-label="Send voice message"
               >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                  />
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                 </svg>
               </button>
             </div>
           ) : (
-            <div className="flex items-end gap-3">
-              <div className="flex-1 relative">
-                <textarea
-                  ref={textareaRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Ask a question about your healthcare data..."
-                  className="w-full px-4 py-3 pr-12 text-sm md:text-base border border-gray-300 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                  rows={1}
-                  disabled={isLoading || isLoadingHistory}
-                />
+            <div className="flex items-end bg-white border border-gray-200 rounded-2xl shadow-sm focus-within:border-primary/40 focus-within:shadow-md focus-within:shadow-primary/5 transition-all duration-200">
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Ask a question about your healthcare data..."
+                className="flex-1 resize-none bg-transparent px-4 py-3.5 text-sm md:text-base text-gray-900 placeholder:text-gray-400 focus:outline-none leading-relaxed"
+                rows={1}
+                disabled={isLoading || isLoadingHistory}
+              />
+              <div className="flex-shrink-0 p-2">
+                {input.trim() ? (
+                  <button
+                    onClick={sendMessage}
+                    disabled={isLoading || isLoadingHistory}
+                    className="p-2.5 bg-primary text-white rounded-xl hover:bg-primary-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-150 shadow-sm"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                  </button>
+                ) : (
+                  <button
+                    onClick={startRecording}
+                    disabled={isLoading || isLoadingHistory}
+                    className="p-2.5 bg-primary text-white rounded-xl hover:bg-primary-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-150 shadow-sm"
+                    aria-label="Record voice message"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-14 0m7 7v4m-4 0h8m-4-12a3 3 0 00-3 3v4a3 3 0 006 0V8a3 3 0 00-3-3z" />
+                    </svg>
+                  </button>
+                )}
               </div>
-              {input.trim() ? (
-                /* Send text button */
-                <button
-                  onClick={sendMessage}
-                  disabled={isLoading || isLoadingHistory}
-                  className="px-5 py-3 bg-primary text-white rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
-                >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                    />
-                  </svg>
-                </button>
-              ) : (
-                /* Mic button — shown when input is empty */
-                <button
-                  onClick={startRecording}
-                  disabled={isLoading || isLoadingHistory}
-                  className="px-5 py-3 bg-primary text-white rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
-                  aria-label="Record voice message"
-                >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 11a7 7 0 01-14 0m7 7v4m-4 0h8m-4-12a3 3 0 00-3 3v4a3 3 0 006 0V8a3 3 0 00-3-3z"
-                    />
-                  </svg>
-                </button>
-              )}
             </div>
           )}
           <p className="mt-2 text-xs text-gray-400 text-center">
-            {isRecording
-              ? "Click send to submit, or X to cancel"
-              : "Press Enter to send, Shift + Enter for new line"}
+            {isRecording ? "Click send to submit, or X to cancel" : "Enter to send · Shift+Enter for new line"}
           </p>
         </div>
       </div>

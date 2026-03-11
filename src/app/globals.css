@@ -8,6 +8,13 @@
 
 body {
   @apply bg-gray-50 text-gray-900;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Chat area background */
+.chat-background {
+  background-color: #f8fafc;
 }
 
 /* Custom scrollbar */
@@ -104,6 +111,39 @@ body {
 
 .markdown-content th {
   @apply bg-gray-100 font-semibold;
+}
+
+/* Chart analysis section markdown overrides */
+.analysis-content {
+  @apply text-gray-700 text-sm leading-relaxed;
+}
+
+.analysis-content p {
+  @apply mb-2;
+}
+
+.analysis-content p:last-child {
+  @apply mb-0;
+}
+
+.analysis-content ul,
+.analysis-content ol {
+  @apply pl-4 mb-2;
+}
+
+.analysis-content li {
+  @apply mb-0.5;
+}
+
+.analysis-content strong {
+  @apply text-primary font-semibold;
+}
+
+.analysis-content h1,
+.analysis-content h2,
+.analysis-content h3,
+.analysis-content h4 {
+  @apply text-primary font-semibold mb-1 mt-3 text-sm;
 }
 
 /* Chat typing animation */
