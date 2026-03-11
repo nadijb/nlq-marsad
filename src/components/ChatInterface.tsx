@@ -126,7 +126,6 @@ export default function ChatInterface() {
     const urlSessionId = searchParams.get("session_id");
     if (urlSessionId) {
       loadSessionMessages(urlSessionId);
-      setIsSidebarOpen(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
