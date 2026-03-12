@@ -4,7 +4,8 @@
       "Bash(npx create-next-app@latest:*)",
       "Bash(npm install:*)",
       "Bash(npm run build:*)",
-      "Bash(cd /c/Users/NadjibBoumekhiet/Desktop/projects/apps/nlq/v2/app && npx tsc --noEmit 2>&1)"
+      "Bash(cd /c/Users/NadjibBoumekhiet/Desktop/projects/apps/nlq/v2/app && npx tsc --noEmit 2>&1)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

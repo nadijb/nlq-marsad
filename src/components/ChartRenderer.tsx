@@ -53,7 +53,47 @@ export default function ChartRenderer({ chartType, data }: ChartRendererProps) {
   const yKey = data.yKey || data.yAxisKey || data.valueKey || ''
   const zKey = data.zKey || ''
 
-  const chartData = data.values.map((item) => {
+  // Defensive guard: values must be an array
+  const safeValues: ChartData['values'] = Array.isArray(data.values) ? data.values : []
+
+  // ── Table ──────────────────────────────────────────────────────────────────
+  if (chartType === 'table' || chartType === 'Table') {
+    if (safeValues.length === 0) {
+      return <div className="p-8 text-center text-sm text-gray-400">No data available</div>
+    }
+    const columns = Object.keys(safeValues[0])
+    return (
+      <div className="w-full overflow-auto p-2 md:p-4">
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr>
+              {columns.map((col) => (
+                <th
+                  key={col}
+                  className="text-left px-4 py-3 font-semibold text-gray-700 bg-gray-50 border-b-2 border-gray-200 whitespace-nowrap"
+                >
+                  {col.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {safeValues.map((row, i) => (
+              <tr key={i} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${i % 2 === 1 ? 'bg-gray-50/40' : 'bg-white'}`}>
+                {columns.map((col) => (
+                  <td key={col} className="px-4 py-2.5 text-gray-600">
+                    {String(row[col] ?? '—')}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
+  const chartData = safeValues.map((item) => {
     const processed: Record<string, string | number> = {}
     Object.keys(item).forEach((key) => {
       const value = item[key]

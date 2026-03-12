@@ -29,12 +29,16 @@ function parseAIContent(content: string): {
   try {
     const parsed = JSON.parse(content);
     // Check if it looks like chart data (has type and data properties)
-    if (parsed.type && parsed.data) {
+    if (parsed.type && parsed.data !== undefined) {
+      // Normalize: chart.data can arrive as a plain array instead of { values: [] }
+      const normalizedData = Array.isArray(parsed.data)
+        ? { values: parsed.data }
+        : parsed.data;
       return {
         type: "chart",
         chartData: {
           type: parsed.type,
-          data: parsed.data,
+          data: normalizedData,
         },
         comment: parsed.comment || undefined,
       };
@@ -169,9 +173,16 @@ export default function ChatInterface() {
     response: Response,
     fallbackError: string,
   ) => {
-    const data: ApiResponse = await response.json();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const raw: any = await response.json();
 
-    if (data.status === "success" && data.data) {
+    // Support two response shapes from n8n:
+    // Shape A (standard): { status: "success", data: { type, ... } }
+    // Shape B (alternate): { success: true, type: "chart", chart: { ... } }
+    const isSuccess = raw.status === "success" || raw.success === true;
+    const payload = raw.data ?? (raw.type ? raw : null);
+
+    if (isSuccess && payload) {
       const assistantMessage: Message = {
         id: uuidv4(),
         role: "assistant",
@@ -179,16 +190,24 @@ export default function ChatInterface() {
         timestamp: new Date(),
       };
 
-      if (data.data.type === "text") {
-        const textData = data.data as TextResponse;
+      if (payload.type === "text") {
+        const textData = payload as TextResponse;
         assistantMessage.content = textData.text.value;
         assistantMessage.responseType = "text";
-      } else if (data.data.type === "chart") {
-        const chartData = data.data as ChartResponse;
+      } else if (payload.type === "chart") {
+        // Normalize: chart.data can be a plain array instead of { values: [] }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rawChartData: any = payload.chart?.data;
+        const normalizedData = Array.isArray(rawChartData)
+          ? { values: rawChartData }
+          : rawChartData;
         assistantMessage.responseType = "chart";
-        assistantMessage.chartData = chartData.chart;
-        assistantMessage.analysis = chartData.analysis?.value;
-        assistantMessage.content = chartData.analysis?.value || "";
+        assistantMessage.chartData = {
+          type: payload.chart?.type,
+          data: normalizedData,
+        };
+        assistantMessage.analysis = payload.analysis?.value;
+        assistantMessage.content = payload.analysis?.value || "";
       }
 
       setMessages((prev) => [...prev, assistantMessage]);
@@ -198,7 +217,7 @@ export default function ChatInterface() {
         {
           id: uuidv4(),
           role: "assistant",
-          content: data.message || fallbackError,
+          content: raw.message || fallbackError,
           responseType: "text",
           timestamp: new Date(),
         },
