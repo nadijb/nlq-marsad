@@ -173,8 +173,7 @@ export default function ChatInterface() {
     response: Response,
     fallbackError: string,
   ) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const raw: any = await response.json();
+    const raw = await response.json();
 
     // Support two response shapes from n8n:
     // Shape A (standard): { status: "success", data: { type, ... } }
@@ -196,8 +195,7 @@ export default function ChatInterface() {
         assistantMessage.responseType = "text";
       } else if (payload.type === "chart") {
         // Normalize: chart.data can be a plain array instead of { values: [] }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const rawChartData: any = payload.chart?.data;
+        const rawChartData = payload.chart?.data;
         const normalizedData = Array.isArray(rawChartData)
           ? { values: rawChartData }
           : rawChartData;
