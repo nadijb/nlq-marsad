@@ -9,6 +9,11 @@ export interface ChartDataValue {
   [key: string]: string | number
 }
 
+export interface TableColumn {
+  key: string
+  label: string
+}
+
 export interface ChartData {
   nameKey?: string
   valueKey?: string
@@ -22,7 +27,9 @@ export interface ChartData {
   unit?: string
   min?: number
   max?: number
-  values: ChartDataValue[]
+  values?: ChartDataValue[]
+  columns?: TableColumn[]
+  rows?: ChartDataValue[]
   lines?: { dataKey: string; stroke?: string; name?: string }[]
   bars?: { dataKey: string; fill?: string; name?: string }[]
 }

@@ -54,14 +54,23 @@ export default function ChartRenderer({ chartType, data }: ChartRendererProps) {
   const zKey = data.zKey || ''
 
   // Defensive guard: values must be an array
-  const safeValues: ChartData['values'] = Array.isArray(data.values) ? data.values : []
+  const safeValues: NonNullable<ChartData['values']> = Array.isArray(data.values) ? data.values : []
 
   // ── Table ──────────────────────────────────────────────────────────────────
   if (chartType === 'table' || chartType === 'Table') {
-    if (safeValues.length === 0) {
+    // New structure: { columns: [{key, label}], rows: [...] }
+    const hasColumnsRows = Array.isArray(data.columns) && Array.isArray(data.rows)
+    const columns = hasColumnsRows
+      ? data.columns!
+      : safeValues.length > 0
+        ? Object.keys(safeValues[0]).map((k) => ({ key: k, label: k.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()) }))
+        : []
+    const rows = hasColumnsRows ? data.rows! : safeValues
+
+    if (rows.length === 0 || columns.length === 0) {
       return <div className="p-8 text-center text-sm text-gray-400">No data available</div>
     }
-    const columns = Object.keys(safeValues[0])
+
     return (
       <div className="w-full overflow-auto p-2 md:p-4">
         <table className="w-full text-sm border-collapse">
@@ -69,20 +78,20 @@ export default function ChartRenderer({ chartType, data }: ChartRendererProps) {
             <tr>
               {columns.map((col) => (
                 <th
-                  key={col}
+                  key={col.key}
                   className="text-left px-4 py-3 font-semibold text-gray-700 bg-gray-50 border-b-2 border-gray-200 whitespace-nowrap"
                 >
-                  {col.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                  {col.label}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {safeValues.map((row, i) => (
+            {rows.map((row, i) => (
               <tr key={i} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${i % 2 === 1 ? 'bg-gray-50/40' : 'bg-white'}`}>
                 {columns.map((col) => (
-                  <td key={col} className="px-4 py-2.5 text-gray-600">
-                    {String(row[col] ?? '—')}
+                  <td key={col.key} className="px-4 py-2.5 text-gray-600">
+                    {String(row[col.key] ?? '—')}
                   </td>
                 ))}
               </tr>
