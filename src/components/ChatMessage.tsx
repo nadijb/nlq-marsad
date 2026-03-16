@@ -1,11 +1,40 @@
 'use client'
 
+import { Component, ReactNode } from 'react'
 import { Message } from '@/types/chat'
 import MarkdownRenderer from './MarkdownRenderer'
 import ChartRenderer from './ChartRenderer'
 
 interface ChatMessageProps {
   message: Message
+}
+
+class ChatMessageErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex items-start gap-3 mb-5">
+          <AIAvatar />
+          <div className="max-w-[82%] bg-white rounded-2xl rounded-tl-sm shadow-sm border border-gray-100 px-4 py-3">
+            <p className="text-sm text-gray-500">Information not available</p>
+          </div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
 }
 
 function AIAvatar() {
@@ -20,7 +49,7 @@ function AIAvatar() {
   )
 }
 
-export default function ChatMessage({ message }: ChatMessageProps) {
+function ChatMessageInner({ message }: ChatMessageProps) {
   const isUser = message.role === 'user'
   const isChart = message.responseType === 'chart' && message.chartData
 
@@ -80,5 +109,13 @@ export default function ChatMessage({ message }: ChatMessageProps) {
         )}
       </div>
     </div>
+  )
+}
+
+export default function ChatMessage({ message }: ChatMessageProps) {
+  return (
+    <ChatMessageErrorBoundary>
+      <ChatMessageInner message={message} />
+    </ChatMessageErrorBoundary>
   )
 }

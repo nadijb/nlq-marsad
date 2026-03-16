@@ -173,7 +173,12 @@ export default function ChatInterface() {
     response: Response,
     fallbackError: string,
   ) => {
-    const raw = await response.json();
+    let raw
+    try {
+      raw = await response.json()
+    } catch {
+      throw new Error(fallbackError)
+    }
 
     // Support two response shapes from n8n:
     // Shape A (standard): { status: "success", data: { type, ... } }
@@ -215,7 +220,7 @@ export default function ChatInterface() {
         {
           id: uuidv4(),
           role: "assistant",
-          content: raw.message || fallbackError,
+          content: "Information not available",
           responseType: "text",
           timestamp: new Date(),
         },
@@ -258,7 +263,7 @@ export default function ChatInterface() {
 
       await handleApiResponse(
         response,
-        "Sorry, I encountered an error processing your request. Please try again.",
+        "Information not available",
       );
     } catch (error) {
       console.error("Error sending message:", error);
@@ -267,8 +272,7 @@ export default function ChatInterface() {
         {
           id: uuidv4(),
           role: "assistant",
-          content:
-            "Sorry, I encountered an error processing your request. Please try again.",
+          content: "Information not available",
           responseType: "text",
           timestamp: new Date(),
         },
@@ -397,7 +401,7 @@ export default function ChatInterface() {
 
       await handleApiResponse(
         response,
-        "Sorry, I encountered an error processing your voice message. Please try again.",
+        "Information not available",
       );
     } catch (error) {
       console.error("Error sending voice message:", error);
@@ -406,8 +410,7 @@ export default function ChatInterface() {
         {
           id: uuidv4(),
           role: "assistant",
-          content:
-            "Sorry, I encountered an error processing your voice message. Please try again.",
+          content: "Information not available",
           responseType: "text",
           timestamp: new Date(),
         },
